@@ -24,6 +24,9 @@ jobs:
       - name: Run Python, BDD and Great Expectations tests
         run: pytest -v
 
+      - name: Create warehouse directory
+        run: mkdir -p warehouse
+
       - name: Load dbt seed data
         working-directory: dbt_project
         run: dbt seed --profiles-dir .
