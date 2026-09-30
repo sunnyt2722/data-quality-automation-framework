@@ -1,0 +1,33 @@
+name: Data Quality CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Python, BDD and Great Expectations tests
+        run: pytest -v
+
+      - name: Load dbt seed data
+        working-directory: dbt_project
+        run: dbt seed --profiles-dir .
+
+      - name: Build and test dbt models
+        working-directory: dbt_project
+        run: dbt build --profiles-dir .

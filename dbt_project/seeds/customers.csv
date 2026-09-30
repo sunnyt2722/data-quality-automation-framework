@@ -1,0 +1,6 @@
+customer_id,first_name,last_name,email,country_code,created_at
+1001,Asha,Patel,asha.patel@example.com,GB,2025-01-12
+1002,Oliver,Smith,oliver.smith@example.com,GB,2025-02-03
+1003,Niamh,Kelly,niamh.kelly@example.com,IE,2025-02-20
+1004,Noah,Williams,noah.williams@example.com,GB,2025-03-01
+1005,Amelia,Brown,amelia.brown@example.com,GB,2025-03-11

@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# dbt generated files
+target/
+logs/
+dbt_project/target/
+dbt_project/logs/
+dbt_project/dbt_packages/
+
+# Local databases
+*.duckdb
+*.duckdb.wal
+
+# Environment / secrets
+.env
+
+# Generated reports
+reports/*.json
+!reports/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local dbt user files
+dbt_project/.user.yml

@@ -1,0 +1,7 @@
+data_quality_automation:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '../warehouse/data_quality.duckdb'
+      threads: 4
