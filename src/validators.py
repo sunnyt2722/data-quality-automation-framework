@@ -32,3 +32,6 @@ def orphan_keys(
     parent_values = set(parent[parent_key].dropna())
 
     return child_values - parent_values
+
+def negative_balance_count(df):
+    return (df["balance"] < 0).sum()

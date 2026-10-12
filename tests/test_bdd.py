@@ -1,6 +1,6 @@
 from pathlib import Path
 from pytest_bdd import scenarios, given, when, then, parsers
-from src.validators import null_count, duplicate_count, orphan_keys
+from src.validators import null_count, duplicate_count, orphan_keys, negative_balance_count
 from src.reconciliation import reconcile
 
 FEATURES = str(Path(__file__).resolve().parents[1] / "features")
@@ -37,3 +37,17 @@ def load_demo(transactions): return reconcile(transactions, transactions.copy(),
 def counts_match(result): assert result.source_count == result.target_count
 @then("transaction amount totals should match")
 def totals_match(result): assert abs(result.source_total-result.target_total) < .01
+
+@given("the accounts dataset is available")
+def accounts_available(accounts):
+    return accounts
+
+
+@when("I validate account balances", target_fixture="result")
+def validate_account_balances(accounts):
+    return negative_balance_count(accounts)
+
+
+@then("all account balances should be non-negative")
+def account_balances_ok(result):
+    assert result == 0
