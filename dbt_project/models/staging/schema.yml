@@ -28,3 +28,34 @@ models:
         data_tests:
           - accepted_values:
               values: ['PENDING', 'COMPLETED', 'FAILED', 'REVERSED']
+  - name: stg_accounts
+    description: "Validated staging model for bank accounts"
+
+    columns:
+      - name: account_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+
+      - name: account_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['SAVINGS', 'CURRENT']
+
+      - name: balance
+        data_tests:
+          - not_null
+
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['ACTIVE', 'CLOSED']

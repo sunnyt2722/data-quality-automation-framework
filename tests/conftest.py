@@ -18,3 +18,7 @@ def customers():
 def transactions():
     """Load the canonical transaction dataset."""
     return pd.read_csv(SEED_DIR / "transactions.csv")
+
+@pytest.fixture
+def accounts():
+    return pd.read_csv("dbt_project/seeds/accounts.csv")

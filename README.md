@@ -1,130 +1,140 @@
+<div align="center">
+
 # Data Quality Automation Framework
 
-A reusable data quality engineering framework demonstrating automated
-validation across ingestion, transformation and reconciliation layers using
-Python, pytest, Great Expectations, dbt and DuckDB.
+**A modular, locally reproducible framework for validating data ingestion, transformations, business rules, and reconciliation.**
 
-The project demonstrates production-oriented data quality engineering
-patterns including:
+Python · pytest · pytest-bdd · Great Expectations · dbt · DuckDB
 
-- Dataset validation
-- Schema and domain validation
-- Referential integrity
-- Business-rule validation
-- Source-to-target reconciliation
-- BDD-based quality requirements
-- Automated negative testing
-- CI/CD quality gates
-- Clear failure reporting
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white) ![pytest](https://img.shields.io/badge/pytest-8.3.5-0A9EDC?logo=pytest&logoColor=white) ![dbt](https://img.shields.io/badge/dbt-1.9.3-FF694B?logo=dbt&logoColor=white) ![DuckDB](https://img.shields.io/badge/DuckDB-local-FFF000?logo=duckdb&logoColor=black) ![Data Tests](https://img.shields.io/badge/dbt%20tests-22%20passing-2EA44F)
+
+</div>
 
 ---
 
-## 1. Architecture
+## Overview
 
-```text
-                         Source Data
-                    customers.csv
-                  transactions.csv
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-             ▼                           ▼
-       Python / Pandas                dbt seed
-             │                           │
-             ▼                           ▼
-    Great Expectations                DuckDB
-             │                           │
-     Dataset Validation                 ▼
-             │                     Staging Models
-             │                    ┌──────┴──────┐
-             │                    │             │
-             │              stg_customers  stg_transactions
-             │                    │             │
-             │                    └──────┬──────┘
-             │                           ▼
-             │              customer_transaction_summary
-             │                           │
-             │                           ▼
-             │                       dbt Tests
-             │
-             └──────────────┬────────────┘
-                            │
-                            ▼
-                          pytest
-               ┌────────────┼────────────┐
-               │            │            │
-              BDD       Validators   Reconciliation
-               │            │            │
-               └────────────┼────────────┘
-                            ▼
-                      CI/CD Quality Gate
-                            │
-                     PASS / FAIL Build
+This project demonstrates a layered approach to data quality engineering for a small, synthetic banking dataset. It validates source data with Python and Great Expectations, loads and transforms records with dbt and DuckDB, checks warehouse-level constraints, and uses BDD to express selected business requirements.
+
+**Key capabilities:** reusable Python validators; declarative and custom SQL tests; referential integrity checks; business-rule validation; source-to-target reconciliation; and a foundation for automated CI/CD quality gates.
+
+> **Implementation scope:** This is a foundational assignment using deterministic local data, not a production banking deployment. The CI/CD architecture and production extensions below describe the intended approach; they should not be interpreted as evidence of a deployed production pipeline.
+
+## Verified results
+
+| Execution | Result | Evidence / scope |
+|:--|:--:|:--|
+| All dbt data tests | **22 passed** | `dbt test` |
+| Custom dbt SQL tests | **3 passed** | `dbt test --select test_type:singular` |
+| Accounts dbt build | **11 passed** | 1 seed + 1 view + 9 generic tests |
+| BDD scenarios | **6 passed** | `python -m pytest tests/test_bdd.py -v` |
+| Standalone account balance pytest | **1 passed** | `python -m pytest tests/test_account_balance.py -v` |
+| Earlier full Python suite | **14 passed** | Before the accounts extension |
+
+> **Verification note:** The full Python suite has not yet been rerun after the accounts extension. Run `python -m pytest -v` for an updated overall count. The targeted Python and BDD results above are verified independently; do not add them together as though they were disjoint suites.
+
+## Contents
+
+- [Architecture](#architecture)
+- [Technology and responsibilities](#technology-and-responsibilities)
+- [Repository structure](#repository-structure)
+- [Datasets and quality rules](#datasets-and-quality-rules)
+- [Getting started](#getting-started)
+- [Running the tests](#running-the-tests)
+- [Adding a new data quality rule](#adding-a-new-data-quality-rule)
+- [Debugging and negative testing](#debugging-and-negative-testing)
+- [Design decisions and future improvements](#design-decisions-and-future-improvements)
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[CSV source data<br/>Customers · Transactions · Accounts]
+    A --> B[Python / pandas]
+    A --> C[dbt seeds]
+    B --> D[pytest validators + BDD]
+    B --> E[Great Expectations]
+    B --> F[Reconciliation checks]
+    C --> G[(DuckDB)]
+    G --> H[Staging views]
+    H --> I[Customer transaction summary]
+    H --> J[dbt generic + singular tests]
+    I --> J
+    D --> K[Quality results]
+    E --> K
+    F --> K
+    J --> K
+    K -.-> L[CI/CD quality gate — intended integration]
 ```
 
-The framework intentionally validates quality at more than one layer.
+**Execution paths are complementary, not strictly sequential.** Python/BDD and Great Expectations validate source-level behaviour, while dbt evaluates loaded and transformed data. Reconciliation checks compare source and target metrics. dbt's `ref()` manages SQL model dependencies.
 
-A source dataset may be structurally valid while still violating a warehouse relationship or business rule. Testing at multiple stages provides defence in depth rather than relying on a single validation mechanism.
+### dbt lineage
 
----
+```text
+customers.csv ── dbt seed ──> stg_customers ──────┐
+                                                   ├──> customer_transaction_summary
+transactions.csv ── dbt seed ──> stg_transactions ──┘
 
-## 2. Technology Stack
+accounts.csv ── dbt seed ──> stg_accounts
+                                  │
+                                  └── customer_id references stg_customers.customer_id
+```
 
-| Technology | Purpose |
-|---|---|
-| Python 3.12 | Core automation language |
-| pandas | Dataset loading and manipulation |
-| pytest | Test execution and assertions |
-| pytest-bdd | BDD/Gherkin-based quality scenarios |
-| Great Expectations | Dataset-level expectations |
-| dbt | Transformation and warehouse quality testing |
-| DuckDB | Lightweight analytical database |
-| GitHub Actions | CI/CD quality gate |
+## Technology and responsibilities
 
-Validated locally using:
+| Technology | Responsibility |
+|:--|:--|
+| **Python 3.12 / pandas** | Read datasets and implement reusable validation functions |
+| **pytest** | Execute Python assertions, data quality checks, and reconciliation tests |
+| **pytest-bdd** | Map Given–When–Then business scenarios to reusable Python validators |
+| **Great Expectations 1.3.8** | Declarative expectations for customer and transaction datasets |
+| **dbt 1.9.3** | Load seeds, build SQL models, run generic and singular tests |
+| **dbt-duckdb 1.9.2 / DuckDB** | Lightweight local analytical database |
+| **GitHub Actions** | Intended automated execution and merge-blocking quality gate |
 
-- Python `3.12.10`
-- pytest `8.3.5`
-- Great Expectations `1.3.8`
-- dbt `1.9.3`
-- dbt-duckdb `1.9.2`
+Locally verified versions also include Python **3.12.10**, pytest **8.3.5**, and pytest-bdd **8.1.0**.
 
----
-
-## 3. Repository Structure
+## Repository structure
 
 ```text
 data-quality-automation-framework/
-│
 ├── .github/
-│   └── workflows/
-│
+│   └── workflows/                       # CI/CD workflow configuration
 ├── dbt_project/
 │   ├── models/
-│   │   └── staging/
+│   │   ├── staging/
+│   │   │   ├── schema.yml                # Generic column / relationship tests
+│   │   │   ├── stg_customers.sql
+│   │   │   ├── stg_transactions.sql
+│   │   │   └── stg_accounts.sql
+│   │   └── marts/
+│   │       └── customer_transaction_summary.sql
 │   ├── seeds/
 │   │   ├── customers.csv
-│   │   └── transactions.csv
-│   ├── tests/
+│   │   ├── transactions.csv
+│   │   └── accounts.csv
+│   ├── tests/                            # Singular dbt SQL tests
+│   │   ├── assert_non_negative_account_balance.sql
+│   │   ├── no_future_transactions.sql
+│   │   └── no_non_positive_completed_transactions.sql
 │   ├── dbt_project.yml
 │   └── profiles.yml
-│
 ├── features/
-│   └── data_quality.feature
-│
+│   ├── data_quality.feature
+│   └── account_balance.feature
 ├── src/
-│   ├── __init__.py
 │   ├── data_loader.py
 │   ├── gx_validation.py
 │   ├── reconciliation.py
 │   └── validators.py
-│
-├── tests/
+├── tests/                                # Python / pytest / BDD tests
+│   ├── conftest.py
+│   ├── test_account_balance.py
 │   ├── test_bdd.py
 │   ├── test_data_quality.py
 │   ├── test_great_expectations.py
 │   └── test_reconciliation.py
-│
 ├── warehouse/
 ├── pytest.ini
 ├── requirements.txt
@@ -132,744 +142,264 @@ data-quality-automation-framework/
 └── README.md
 ```
 
----
+> There are **two different `tests/` directories**: `dbt_project/tests/` contains singular SQL tests; root `tests/` contains Python and BDD tests.
 
-## 4. Data Flow
+## Datasets and quality rules
 
-The sample pipeline contains two primary datasets:
+The repository uses synthetic data to make failures easy to reproduce and diagnose.
 
-### Customers
+| Dataset | Representative fields | Validation examples |
+|:--|:--|:--|
+| **Customers** | `customer_id`, `email`, `country_code` | Required/unique IDs, non-null email, accepted country codes (`GB`, `IE`) |
+| **Transactions** | `transaction_id`, `customer_id`, `currency`, `status`, `amount` | Required/unique IDs, valid customer reference, allowed currency/status, no future dates, positive amount when completed |
+| **Accounts** | `account_id`, `customer_id`, `account_type`, `balance`, `status` | Required/unique account ID, valid customer reference, accepted types/statuses, non-null and non-negative balance |
 
-Contains customer-level information.
+The accounts seed contains four sample accounts linked to customer IDs `1001`, `1002`, and `1003`. A customer can have multiple accounts; an account ID must remain unique.
 
-Key quality requirements include:
+### Validation layers
 
-- `customer_id` must not be null
-- `customer_id` must be unique
-- email must be populated
-- country codes must belong to the supported domain
+| Layer | Where rules live | Examples |
+|:--|:--|:--|
+| **Source-level Python** | `src/validators.py`, root `tests/` | Null counts, duplicate counts, orphan keys, negative balances |
+| **Business-readable BDD** | `features/`, `tests/test_bdd.py` | Account balances must be non-negative |
+| **Dataset expectations** | `src/gx_validation.py` | Required fields, unique identifiers, accepted values |
+| **Warehouse generic tests** | `dbt_project/models/staging/schema.yml` | `not_null`, `unique`, `accepted_values`, `relationships` |
+| **Warehouse singular tests** | `dbt_project/tests/*.sql` | Non-negative balance, no future transactions, positive completed amounts |
+| **Reconciliation** | `src/reconciliation.py` | Row-count and amount-total comparisons |
 
-### Transactions
+## Getting started
 
-Contains transaction-level information.
+Run the following from the **repository root** using Windows PowerShell.
 
-Key quality requirements include:
-
-- `transaction_id` must not be null
-- `transaction_id` must be unique
-- `customer_id` must not be null
-- transaction customer must exist in the customer dataset
-- currency must belong to the supported domain
-- transaction status must contain an accepted value
-- completed transactions must have a positive amount
-- transactions must not occur in the future
-
----
-
-## 5. Data Quality Strategy
-
-The framework applies quality controls across several dimensions.
-
-| Quality Dimension | Example |
-|---|---|
-| Completeness | Customer and transaction IDs cannot be null |
-| Uniqueness | Transaction IDs must be unique |
-| Validity | Currency/status must use accepted values |
-| Referential Integrity | Transaction customer must exist |
-| Business Rules | Completed transaction amount must be positive |
-| Timeliness | Future transactions are rejected |
-| Reconciliation | Source and target records must reconcile |
-
-This separation allows quality rules to be applied at the layer where they provide the most value.
-
----
-
-## 6. Python / pytest Validation
-
-Python validators provide lightweight reusable checks for source datasets.
-
-Examples include:
-
-- identifier completeness
-- identifier uniqueness
-- mandatory fields
-- domain validation
-- customer-reference validation
-- transaction business rules
-
-Run the complete Python suite from the project root:
-
-```powershell
-pytest -v
-```
-
-Current verified result:
-
-```text
-14 passed
-```
-
-The suite includes:
-
-- BDD tests
-- Python data-quality tests
-- Great Expectations tests
-- reconciliation tests
-
----
-
-## 7. Great Expectations
-
-Great Expectations provides an additional declarative dataset-validation layer.
-
-Customer expectations include:
-
-- customer ID is populated
-- customer ID is unique
-- email is populated
-- country code belongs to an accepted set
-
-Transaction expectations include:
-
-- transaction ID is populated
-- transaction ID is unique
-- customer ID is populated
-- currency belongs to an accepted set
-- status belongs to an accepted set
-
-The implementation is located in:
-
-```text
-src/gx_validation.py
-```
-
-and exercised through:
-
-```text
-tests/test_great_expectations.py
-```
-
-Run only the Great Expectations tests with:
-
-```powershell
-pytest tests/test_great_expectations.py -v
-```
-
-Verified result:
-
-```text
-2 passed
-```
-
----
-
-## 8. BDD Validation
-
-Selected business-readable data quality requirements are expressed using BDD scenarios.
-
-This allows requirements to be communicated using:
-
-```gherkin
-Given a customer dataset
-When customer identifiers are validated
-Then customer identifiers should be complete and unique
-```
-
-BDD is intentionally used for business-facing quality behaviour rather than every low-level technical assertion.
-
-This keeps feature files readable while technical checks remain in pytest, dbt and Great Expectations.
-
----
-
-## 9. dbt Data Pipeline
-
-dbt is responsible for loading the sample datasets, creating transformation models and validating warehouse-level quality.
-
-The project currently contains:
-
-```text
-2 seeds
-3 models
-12 data tests
-```
-
-Models include staging representations of customer and transaction data and a downstream customer transaction summary.
-
----
-
-## 10. dbt Tests
-
-dbt validates warehouse-level constraints including:
-
-### Generic tests
-
-- `not_null`
-- `unique`
-- `accepted_values`
-- `relationships`
-
-### Business-rule tests
-
-Additional SQL-based quality rules validate conditions such as:
-
-- transactions must not occur in the future
-- completed transactions must have positive amounts
-
-Current verified result:
-
-```text
-PASS=12
-WARN=0
-ERROR=0
-SKIP=0
-TOTAL=12
-```
-
----
-
-## 11. Source-to-Target Reconciliation
-
-Reconciliation provides another layer beyond individual column checks.
-
-The framework compares source and target information to detect problems such as:
-
-- missing records
-- unexpected additional records
-- load discrepancies
-
-This is particularly important in ETL/data pipelines because a transformation can satisfy schema rules while still losing or duplicating data.
-
-Reconciliation logic is separated into:
-
-```text
-src/reconciliation.py
-```
-
-with automated coverage in:
-
-```text
-tests/test_reconciliation.py
-```
-
----
-
-## 12. Local Setup
-
-### Prerequisites
-
-Python 3.12 is recommended.
-
-Create the virtual environment:
+### 1. Create and activate the environment
 
 ```powershell
 py -3.12 -m venv .venv
-```
-
-Activate it:
-
-```powershell
 .\.venv\Scripts\Activate.ps1
-```
-
-Upgrade pip:
-
-```powershell
 python -m pip install --upgrade pip
-```
-
-Install dependencies:
-
-```powershell
 pip install -r requirements.txt
 ```
 
-Verify Great Expectations:
+### 2. Validate the Python environment
 
 ```powershell
+python --version
+python -m pytest --version
 python -c "import great_expectations as gx; print(gx.__version__)"
 ```
 
----
-
-## 13. Running Python Tests
-
-From the repository root:
-
-```powershell
-pytest -v
-```
-
-Expected result:
-
-```text
-14 passed
-```
-
-Individual test layers can also be executed independently.
-
-For example:
-
-```powershell
-pytest tests/test_data_quality.py -v
-```
-
-```powershell
-pytest tests/test_great_expectations.py -v
-```
-
-```powershell
-pytest tests/test_reconciliation.py -v
-```
-
----
-
-## 14. Running dbt
-
-Navigate to:
+### 3. Load and validate warehouse data
 
 ```powershell
 cd dbt_project
-```
-
-Validate configuration:
-
-```powershell
 dbt debug
-```
-
-Load seed data:
-
-```powershell
 dbt seed
-```
-
-Create models:
-
-```powershell
 dbt run
-```
-
-Execute data-quality tests:
-
-```powershell
 dbt test
 ```
 
-A combined dbt execution can also be performed with:
+Or use the combined dependency-aware command:
 
 ```powershell
 dbt build
 ```
 
-The local DuckDB warehouse is created under:
+`dbt seed` loads CSVs; `dbt run` builds SQL models; `dbt test` executes registered data tests; `dbt build` executes selected resources in dependency order. A failed upstream step should stop a scripted pipeline rather than allowing downstream commands to run on stale data.
 
-```text
-warehouse/
+## Running the tests
+
+### Python tests — from repository root
+
+```powershell
+# All Python tests
+python -m pytest -v
+
+# Individual suites
+python -m pytest tests/test_account_balance.py -v
+python -m pytest tests/test_bdd.py -v
+python -m pytest tests/test_great_expectations.py -v
+python -m pytest tests/test_reconciliation.py -v
 ```
 
----
+### dbt tests — from `dbt_project/`
 
-## 15. Verified Test Results
+```powershell
+# All registered data tests
+dbt test
 
-The framework has been executed locally rather than provided as an untested reference implementation.
+# Only custom SQL tests
+dbt test --select test_type:singular
 
-### Python
+# Only account-model tests
+dbt test --select stg_accounts
 
-```text
-14 tests collected
-14 passed
+# Reload the accounts seed, rebuild its view and run selected generic tests
+dbt build --select +stg_accounts
+
+# Inspect registered test names
+dbt ls --resource-type test
 ```
 
-This covers:
+**Current dbt inventory:** 3 seeds, 4 models and **22 data tests** (19 generic and 3 singular). The full `dbt test` execution passed **22/22**; all three singular SQL tests also passed when selected independently.
 
-```text
-BDD
-Data Quality Validators
-Great Expectations
-Reconciliation
+### Understanding PASS, FAIL, and ERROR
+
+| Outcome | Meaning | Example |
+|:--|:--|:--|
+| **PASS** | The validation executed and found no violations | All balances are non-negative |
+| **FAIL** | The validation executed and found invalid rows | A completed transaction has a non-positive amount |
+| **ERROR** | The test could not execute correctly | Missing relation or incompatible data types |
+
+For a **singular dbt SQL test**, **zero returned rows means PASS**; returned rows are treated as rule violations.
+
+## Adding a new data quality rule
+
+The accounts extension demonstrates how to onboard a dataset and implement the same rule at different layers.
+
+### A. Add a custom dbt SQL test
+
+Create `dbt_project/tests/assert_non_negative_account_balance.sql`:
+
+```sql
+SELECT
+    account_id,
+    balance
+FROM {{ ref('stg_accounts') }}
+WHERE balance < 0
 ```
 
-### dbt
+Execute from `dbt_project/`:
 
-```text
-2 seeds
-3 models
-12 data tests
+```powershell
+dbt test --select assert_non_negative_account_balance
 ```
 
-Final clean execution:
+`ref('stg_accounts')` resolves the existing model and registers the dependency. The query returns **only invalid accounts**.
 
-```text
-PASS=12
-WARN=0
-ERROR=0
-SKIP=0
-TOTAL=12
+The other two singular tests in the project check that transaction dates are not in the future and that completed transactions have positive amounts.
+
+### B. Add a reusable Python validator
+
+In `src/validators.py`:
+
+```python
+def negative_balance_count(df):
+    return (df["balance"] < 0).sum()
 ```
 
----
+In `tests/test_account_balance.py`:
 
-## 16. Negative Testing
+```python
+import pandas as pd
+from src.validators import negative_balance_count
 
-Controlled negative testing was performed to verify that the framework detects genuine quality failures rather than only demonstrating successful tests.
 
-### Invalid customer reference
-
-A transaction was modified to reference a customer that did not exist in the customer dataset.
-
-The framework detected the invalid data.
-
-At the Python/Great Expectations layer, the quality suite changed from:
-
-```text
-14 passed
+def test_account_balances_are_non_negative():
+    df = pd.read_csv("dbt_project/seeds/accounts.csv")
+    result = negative_balance_count(df)
+    assert result == 0, f"Found {result} accounts with negative balances"
 ```
 
-to:
+Verified: **1 passed**.
 
-```text
-13 passed
-1 failed
+### C. Reuse the existing BDD step definitions
+
+`features/account_balance.feature`:
+
+```gherkin
+Feature: Account balance validation
+
+  Scenario: Accounts must not have negative balances
+    Given the accounts dataset is available
+    When I validate account balances
+    Then all account balances should be non-negative
 ```
 
-After restoring the valid data:
+The corresponding Given/When/Then definitions are added to the **existing** `tests/test_bdd.py`, which discovers feature files via `scenarios(FEATURES)`. An `accounts` fixture loads the seed CSV; the When step calls `negative_balance_count(accounts)` and uses `target_fixture="result"`; the Then step asserts `result == 0`.
 
-```text
-14 passed
+Verified: **6 BDD scenarios passed** (including the new account scenario).
+
+### D. Extend generic dbt tests
+
+In `dbt_project/models/staging/schema.yml`, the `stg_accounts` model declares nine generic tests covering account ID, customer ID, account type, balance, and status. For example:
+
+```yaml
+- name: stg_accounts
+  columns:
+    - name: account_id
+      data_tests:
+        - not_null
+        - unique
+    - name: customer_id
+      data_tests:
+        - not_null
+        - relationships:
+            to: ref('stg_customers')
+            field: customer_id
 ```
 
-### Referential integrity
+This is an **excerpt** from the existing `models:` list, not a complete replacement for `schema.yml`.
 
-A valid numeric but nonexistent customer identifier was introduced into the transaction seed.
+## Debugging and negative testing
 
-The data successfully loaded and the dbt models executed, but the relationship test failed:
+The framework was tested against controlled invalid inputs as well as valid data.
 
-```text
-relationships_stg_transactions_customer_id...
-FAIL
-```
+| Scenario | Observed behaviour | Lesson |
+|:--|:--|:--|
+| Missing customer reference | Relationship test failed | Referential integrity is checked after ingestion |
+| Duplicate transaction ID | `unique` test failed | Schema-valid data can still violate uniqueness |
+| Alphanumeric value in numeric seed column | Seed conversion error | Type compatibility matters before transformation |
+| New account IDs like `C001` vs numeric customer IDs | DuckDB relationship test ERROR | Align join-key types and actual values |
+| `stg_accounts` tests before building the view | Missing-relation ERROR | Build dependencies before testing |
+| New tests absent from selection | Full dbt reparse resolved registration | Check manifest/discovery before changing valid YAML |
 
-This demonstrates that ingestion success does not imply data-quality success.
+**Accounts extension troubleshooting:** the initial accounts seed referenced customer IDs `C001`–`C003`, whereas the existing customers seed used numeric IDs `1001`–`1005`. Updating the new seed to use valid existing customer IDs and rebuilding resolved the type mismatch. The accounts build then completed with **11/11 successful operations**.
 
-### Duplicate transaction
-
-During negative testing, dbt also detected a duplicate transaction identifier through:
-
-```text
-unique_stg_transactions_transaction_id
-FAIL
-```
-
-### Schema/type incompatibility
-
-An alphanumeric customer identifier was also introduced into a column represented as numeric in the existing warehouse schema.
-
-dbt/DuckDB rejected the record during seed loading because the incoming value could not be converted to the expected type.
-
-This demonstrates validation at multiple boundaries:
-
-```text
-Incoming Data
-     │
-     ├── Schema / Type Validation
-     │
-     ├── Dataset Expectations
-     │
-     ├── Uniqueness
-     │
-     ├── Referential Integrity
-     │
-     ├── Business Rules
-     │
-     └── Reconciliation
-```
-
-All intentionally invalid data was removed after negative testing.
-
-The repository remains in a clean passing state.
-
----
-
-## 17. Fail-Fast Execution
-
-An important pipeline behaviour identified during testing is that downstream commands should not execute when an upstream load fails.
-
-For example:
+### Avoid stale warehouse state
 
 ```text
 dbt seed
-    │
-    ├── PASS → dbt run → dbt test
-    │
-    └── FAIL → STOP
+   ├── PASS → dbt run → dbt test
+   └── FAIL → STOP
 ```
 
-If `dbt seed` fails but execution continues manually, the existing warehouse may still contain data from a previous successful load.
+If a load fails but later commands continue, they may query relations left from an earlier successful run. Use a fail-fast CI/CD job or `dbt build` where appropriate.
 
-Subsequent `dbt run` or `dbt test` commands could therefore operate against stale data.
+## Design decisions and future improvements
 
-A CI/CD implementation should consequently use fail-fast behaviour so that a failed ingestion step prevents downstream validation.
+### Why these tools?
 
----
+- **DuckDB** keeps the exercise self-contained while supporting realistic SQL transformations.
+- **dbt** places schema, relationships, and SQL business rules close to warehouse models.
+- **pytest** makes custom Python checks, assertions, and reusable fixtures straightforward.
+- **pytest-bdd** expresses selected business requirements in language stakeholders can review.
+- **Great Expectations** provides another declarative validation mechanism for source datasets.
+- **Reconciliation** checks row counts and totals that isolated column-level tests might miss.
 
-## 18. CI/CD Quality Gate
+The intent is **layered coverage, not duplicating every rule in every tool**. The account balance rule is intentionally implemented across tools as a demonstration.
 
-The framework is designed to execute automatically on repository changes.
+### CI/CD quality gate
 
-A typical pipeline is:
+A target workflow is: checkout → Python setup → dependency installation → Python tests + dbt build → publish results → block promotion on failure. A non-zero test exit code should fail the job. Actual CI behaviour should be confirmed against the workflow file before claiming it is deployed.
 
-```text
-Developer Push / Pull Request
-             │
-             ▼
-       Checkout Repository
-             │
-             ▼
-         Python 3.12
-             │
-             ▼
-      Install Dependencies
-             │
-        ┌────┴────┐
-        ▼         ▼
-      pytest    dbt seed
-        │         │
-        │       dbt run
-        │         │
-        │       dbt test
-        │         │
-        └────┬────┘
-             ▼
-        Quality Gate
-          │       │
-        PASS     FAIL
-          │       │
-          ▼       ▼
-        Merge    Block
-```
+### Production extensions
 
-A quality failure should return a non-zero exit code and fail the pipeline.
+| Area | Proposed enhancement |
+|:--|:--|
+| **Scalability** | Warehouse-side aggregation, incremental and partition-aware tests |
+| **Data contracts** | Schema drift detection and versioned data contracts |
+| **Observability** | Null-rate trends, freshness, reconciliation variance, failure history |
+| **Failure handling** | Quarantine invalid records and severity-based quality gates |
+| **Operations** | Notifications, test reports, historical results, secure secrets management |
+| **Security** | Avoid exposing customer data in logs, test artifacts, or local extracts |
 
-This prevents invalid data-model changes or broken quality rules from silently progressing.
+The sample data is synthetic. A production banking implementation should keep validation close to governed data platforms, minimise unnecessary movement of sensitive records, and use approved credentials and access controls.
 
 ---
 
-## 19. Why Multiple Testing Tools?
+<div align="center">
 
-The tools are intentionally assigned different responsibilities.
+**Project status:** dbt **22/22 passed** · BDD **6/6 passed** · account pytest **1/1 passed**  
+*Full post-extension Python suite: rerun required for an updated total.*
 
-### pytest
-
-Acts as the core Python test runner and supports custom validation logic and assertions.
-
-### Great Expectations
-
-Provides reusable dataset-level expectations and expressive data-quality validation.
-
-### dbt
-
-Tests transformed warehouse data and relationships close to the analytical data model.
-
-### pytest-bdd
-
-Makes selected business-critical data quality requirements understandable using Given/When/Then scenarios.
-
-### Reconciliation
-
-Validates that movement between source and target has not unexpectedly changed the dataset.
-
-The objective is not to duplicate every rule in every tool.
-
-Instead, each mechanism is used where it provides the strongest value.
-
----
-
-## 20. Design Decisions
-
-### DuckDB
-
-DuckDB was selected because it provides SQL and analytical database behaviour without requiring external database infrastructure.
-
-For a foundational assignment this keeps setup reproducible while preserving realistic data-transformation patterns.
-
-### Seed Data
-
-Small deterministic seed datasets make the framework:
-
-- repeatable
-- easy to understand
-- fast to execute
-- suitable for CI/CD
-
-Production systems would replace these with controlled connections to actual source and warehouse environments.
-
-### Modular Validators
-
-Validation, loading and reconciliation logic are separated so they can evolve independently.
-
-This avoids embedding all quality logic directly inside test cases.
-
-### Layered Validation
-
-No single tool is treated as the entire data-quality solution.
-
-Instead:
-
-```text
-Source Quality
-      ↓
-Schema Quality
-      ↓
-Transformation Quality
-      ↓
-Business Rules
-      ↓
-Referential Integrity
-      ↓
-Reconciliation
-```
-
-This provides defence in depth.
-
----
-
-## 21. Production Considerations
-
-For a production banking data platform, the framework could be extended with:
-
-### Data-volume validation
-
-Large datasets should use database-side aggregation and comparison rather than loading complete datasets into pandas memory.
-
-### Incremental validation
-
-Quality checks could run against changed partitions or processing windows rather than repeatedly scanning entire tables.
-
-### Data observability
-
-Metrics such as the following could be published:
-
-- row-count variance
-- null-rate trends
-- duplicate-rate trends
-- freshness
-- schema drift
-- reconciliation differences
-- quality failure frequency
-
-### Quarantine
-
-Invalid records could be moved into a quarantine dataset rather than silently discarded.
-
-For example:
-
-```text
-Incoming Data
-      │
-      ▼
-Quality Validation
-   │         │
- PASS       FAIL
-   │         │
-   ▼         ▼
-Warehouse  Quarantine
-              │
-              ▼
-        Investigation
-```
-
-### Alerting
-
-CI/CD or production data-pipeline failures could notify engineering teams through the organisation's alerting platform.
-
-### Historical quality results
-
-Validation outcomes could be stored so teams can monitor quality trends rather than only seeing individual pass/fail executions.
-
----
-
-## 22. Security and PII
-
-The repository uses synthetic sample data.
-
-A production implementation handling banking/customer data should avoid exposing sensitive information in:
-
-- Git repositories
-- CI logs
-- test reports
-- exception messages
-- screenshots
-- local development files
-
-Credentials should be provided through secure CI/CD secrets or an approved secrets-management platform rather than committed configuration.
-
-Production validation should also minimise unnecessary movement of customer-level data.
-
-Where possible, quality checks should execute close to the data platform and return aggregated validation results rather than extracting sensitive datasets.
-
----
-
-## 23. Further Improvements
-
-Given additional development time, useful extensions would include:
-
-- schema-contract validation
-- automated schema-drift detection
-- configurable severity levels
-- warning vs blocking quality rules
-- reusable Great Expectations suites
-- richer validation reports
-- historical quality metrics
-- data freshness/SLA validation
-- partition-level reconciliation
-- automated anomaly detection
-- containerised execution
-- production warehouse adapters
-- centralised quality-rule configuration
-
----
-
-## 24. Summary
-
-This framework demonstrates a layered approach to automated data quality engineering.
-
-It validates data across:
-
-```text
-Source datasets
-      ↓
-Great Expectations
-      ↓
-Python validation
-      ↓
-dbt transformation
-      ↓
-Warehouse tests
-      ↓
-Business rules
-      ↓
-Reconciliation
-      ↓
-CI/CD quality gate
-```
-
-The final verified local state is:
-
-```text
-Python / pytest
-14 / 14 passing
-
-dbt
-2 seeds
-3 models
-12 / 12 data tests passing
-```
-
-Controlled negative testing also demonstrated that the framework detects:
-
-- invalid schema/type values
-- orphan customer references
-- duplicate transaction identifiers
-- dataset quality violations
-
-The framework is intentionally small enough to understand and execute locally while demonstrating patterns that can be extended to larger production data platforms.
+</div>
