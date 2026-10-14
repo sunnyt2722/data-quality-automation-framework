@@ -21,4 +21,8 @@ def transactions():
 
 @pytest.fixture
 def accounts():
-    return pd.read_csv("dbt_project/seeds/accounts.csv")
+    return pd.read_csv(SEED_DIR / "accounts.csv")
+
+@pytest.fixture
+def payments():
+    return pd.read_csv(SEED_DIR / "payments.csv")

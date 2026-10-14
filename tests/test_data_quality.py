@@ -21,3 +21,7 @@ def test_transaction_customer_references(customers, transactions):
 def test_completed_transaction_amounts_are_positive(transactions):
     bad = transactions[(transactions.status == "COMPLETED") & (transactions.amount <= 0)]
     assert bad.empty
+
+def test_payments_are_complete_and_unique(payments):
+    assert null_count(payments, "payment_id") == 0
+    assert duplicate_count(payments, "payment_id") == 0

@@ -1,0 +1,5 @@
+payment_id,customer_id,payment_amount,payment_status
+P001,1001,250.00,COMPLETED
+P002,1002,100.00,PENDING
+P003,1003,500.00,COMPLETED
+P004,1001,75.00,FAILED
